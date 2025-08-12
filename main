@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Work Hours Tracker — Standalone</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+    body{background:linear-gradient(180deg,#071024 0%,#081226 60%);color:#e6eef6;padding:20px}
+    .app{max-width:1100px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px}
+    h1{margin:0;font-size:20px}
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.02)}
+    .grid{display:grid;gap:12px}
+    .row{display:flex;gap:12px;align-items:center}
+    input,select,button,textarea{background:var(--glass);color:inherit;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px}
+    button{cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
+    .entries{margin-top:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+    .live{background:linear-gradient(90deg,var(--accent),#60a5fa);color:#021124;padding:8px 12px;border-radius:10px}
+    .pill{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:999px}
+    .small{font-size:13px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .tz{font-size:12px;color:var(--muted)}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+    .stat{flex:1;min-width:150px;padding:12px}
+    .danger{background:#3b082b}
+    .green{background:#052e12}
+    .accentBox{background:linear-gradient(180deg,rgba(6,182,212,0.06),transparent)}
+    .tiny{font-size:12px;color:var(--muted)}
+    .tag{background:rgba(255,255,255,0.04);padding:4px 8px;border-radius:6px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="card" style="display:flex;align-items:center;gap:12px">
+        <div style="width:56px;height:56px;background:linear-gradient(135deg,var(--accent),#7c3aed);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700">WH</div>
+        <div>
+          <h1>Work Hours Tracker — Standalone</h1>
+          <div class="tiny tz">Persistent, offline-first. Saves to your browser (localStorage).</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid" style="margin-top:14px">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="muted small">Live Timer</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <button id="liveStartBtn" class="live">Start Live</button>
+              <button id="liveStopBtn" disabled>Stop</button>
+              <div class="pill" id="liveDisplay">Not running</div>
+            </div>
+            <div class="tiny muted" style="margin-top:6px">Unique: supports <strong>Start Late</strong> (begin live session but backdate the start), auto-break suggestion, project tags, and smart rounding.</div>
+          </div>
+          <div style="min-width:260px">
+            <div class="muted small">Quick Wage & Pay Preview</div>
+            <div class="row" style="margin-top:8px">
+              <input id="wageInput" placeholder="Hourly wage" type="number" step="0.01">
+              <select id="periodSelect">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Biweekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+              <div id="payPreview" class="pill">$0.00</div>
+            </div>
+            <div class="tiny muted" style="margin-top:6px">Set wage and the period — tap any summary card below to apply that period to previewed earnings.</div>
+          </div>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px dashed rgba(255,255,255,0.02)">
+
+        <div class="row" style="gap:10px;align-items:flex-start">
+          <div style="flex:1">
+            <div class="muted small">Manual Entry</div>
+            <div class="row" style="margin-top:8px">
+              <input id="manualStart" type="datetime-local" />
+              <input id="manualEnd" type="datetime-local" />
+              <input id="manualProject" placeholder="Project / Tag" style="width:120px">
+              <button id="addManual">Add</button>
+            </div>
+            <div class="tiny muted" style="margin-top:6px">Or add partial hours like "1.5" in the end to log fractional hours (just type decimals into end field). You can also edit entries later.</div>
+          </div>
+          <div style="width:320px">
+            <div class="muted small">Start Late</div>
+            <div class="row" style="margin-top:8px">
+              <input id="startLateTime" type="datetime-local">
+              <input id="startLateProject" placeholder="Project / Tag">
+              <button id="startLateBtn">Start Live (Backdated)</button>
+            </div>
+            <div class="tiny muted" style="margin-top:6px">Start a live session and set the start to a past time. Good if you forgot to start the timer.</div>
+          </div>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px dashed rgba(255,255,255,0.02)">
+
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>
+            <strong>Filters & View</strong>
+            <div class="tiny muted">Filter entries by range, tag, or search notes.</div>
+          </div>
+          <div class="controls">
+            <input id="filterFrom" type="date"> <input id="filterTo" type="date"> 
+            <input id="filterTag" placeholder="Tag filter" style="width:110px">
+            <select id="presetRange"><option value="all">All</option><option value="this_week">This week</option><option value="last_week">Last week</option><option value="this_month">This month</option><option value="biweekly">This biweekly</option></select>
+            <button id="applyFilter">Apply</button>
+            <button id="clearFilter">Clear</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="muted small">Entries</div>
+            <div class="tiny muted">Your saved time entries (editable). Supports undo of last delete.</div>
+          </div>
+          <div class="controls">
+            <button id="exportCSV">Export CSV</button>
+            <input id="importFile" type="file" accept="text/csv"> 
+            <button id="undoDelete">Undo Delete</button>
+          </div>
+        </div>
+
+        <div class="entries" id="entriesArea">
+          <table id="entriesTable">
+            <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Hours</th><th>Project</th><th>Notes</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="stats" id="summaryArea"></div>
+      </div>
+
+      <div class="card">
+        <strong>Advanced / Unique Features</strong>
+        <ul class="tiny muted">
+          <li>Automatic break suggestion: if you log a shift longer than 6 hours, app suggests a 30-min unpaid break and shows adjusted pay.</li>
+          <li>Smart rounding options (nearest 5/10/15 minutes) for payroll-friendly rounding.</li>
+          <li>Project-based summaries and earnings per project.</li>
+          <li>Overtime highlight (configurable threshold; default 40h / week).</li>
+          <li>Offline-first: all data kept in browser localStorage. Export/Import CSV for backup or transfer.</li>
+        </ul>
+
+        <hr style="margin:12px 0;border:none;border-top:1px dashed rgba(255,255,255,0.02)">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="flex:1">
+            <label class="tiny muted">Rounding</label>
+            <select id="roundingSelect"><option value="none">No rounding</option><option value="5">Nearest 5 min</option><option value="10">Nearest 10 min</option><option value="15">Nearest 15 min</option></select>
+          </div>
+          <div style="width:200px">
+            <label class="tiny muted">Overtime threshold (hours/week)</label>
+            <input id="overtimeThreshold" type="number" value="40" min="1">
+          </div>
+          <div>
+            <label class="tiny muted">Auto-break suggestion</label>
+            <input id="autoBreakOn" type="checkbox" checked>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <footer class="muted tiny">Made for you — data stored locally in your browser. Use Export to keep backups. Not connected to any server.</footer>
+  </div>
+
+  <script>
+    /* -------------------- Storage and utilities -------------------- */
+    const STORAGE_KEY = 'work-hours-tracker-v1';
+    const state = {
+      entries: [], // {id, startISO, endISO, project, notes}
+      live: null, // {id, startISO, project}
+      lastDeleted: null,
+      settings: {rounding: 'none', overtimeThreshold: 40, autoBreakOn: true}
+    };
+
+    function saveState(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+    function loadState(){
+      const s = localStorage.getItem(STORAGE_KEY);
+      if(s){
+        try{Object.assign(state, JSON.parse(s));}catch(e){console.error('state load failed',e)}
+      }
+    }
+
+    function uid(){return 'id-'+Math.random().toString(36).slice(2,9)}
+
+    function isoToLocalStr(iso){ if(!iso) return ''; const d=new Date(iso); return d.toLocaleString(); }
+    function isoToDate(iso){ if(!iso) return ''; const d=new Date(iso); return d.toLocaleDateString(); }
+    function diffHours(startISO,endISO){ const s=new Date(startISO); const e=new Date(endISO); return (e - s)/36e5; }
+
+    function roundMinutes(date, toMinutes){ if(!toMinutes || toMinutes==='none') return date; toMinutes = Number(toMinutes);
+      const ms = date.getTime(); const mins = date.getMinutes(); const total = date.getHours()*60 + mins;
+      const rounded = Math.round(total / toMinutes) * toMinutes; const h = Math.floor(rounded/60); const m = rounded % 60;
+      const nd = new Date(date); nd.setHours(h); nd.setMinutes(m); nd.setSeconds(0); nd.setMilliseconds(0); return nd;
+    }
+
+    /* -------------------- Rendering -------------------- */
+    const entriesTbody = document.querySelector('#entriesTable tbody');
+    const liveDisplay = document.getElementById('liveDisplay');
+    const liveStartBtn = document.getElementById('liveStartBtn');
+    const liveStopBtn = document.getElementById('liveStopBtn');
+    const wageInput = document.getElementById('wageInput');
+    const periodSelect = document.getElementById('periodSelect');
+    const payPreview = document.getElementById('payPreview');
+    const summaryArea = document.getElementById('summaryArea');
+
+    function renderEntries(filter){
+      entriesTbody.innerHTML = '';
+      const list = (state.entries || []).slice().sort((a,b)=> new Date(b.startISO) - new Date(a.startISO));
+      const now = Date.now();
+      const rounding = (state.settings && state.settings.rounding) || 'none';
+
+      list.forEach(entry=>{
+        if(filter){
+          if(filter.tag && entry.project && !entry.project.toLowerCase().includes(filter.tag.toLowerCase())) return;
+          if(filter.from && new Date(entry.startISO) < new Date(filter.from)) return;
+          if(filter.to && new Date(entry.startISO) > new Date(new Date(filter.to).getTime()+86400000)) return;
+        }
+        const tr = document.createElement('tr');
+        const dateTd = document.createElement('td'); dateTd.textContent = isoToDate(entry.startISO);
+        const startTd = document.createElement('td'); startTd.textContent = isoToLocalStr(entry.startISO);
+        const endTd = document.createElement('td'); endTd.textContent = entry.endISO ? isoToLocalStr(entry.endISO) : '—';
+        const hoursTd = document.createElement('td');
+        let hours = entry.endISO ? diffHours(entry.startISO, entry.endISO) : (new Date() - new Date(entry.startISO))/36e5;
+        // apply rounding to hours display
+        if(rounding && rounding!=='none'){
+          // rounding to nearest X minutes => adjust displayed hours
+          const mins = Number(rounding);
+          const start = new Date(entry.startISO);
+          const end = entry.endISO ? new Date(entry.endISO) : new Date();
+          const rs = roundMinutes(start, mins);
+          const re = roundMinutes(end, mins);
+          hours = (re - rs)/36e5;
+        }
+        hoursTd.textContent = (hours>=0?hours:0).toFixed(2);
+        const projectTd = document.createElement('td'); projectTd.textContent = entry.project || '';
+        const notesTd = document.createElement('td'); notesTd.textContent = entry.notes || '';
+        const controlTd = document.createElement('td');
+        const editBtn = document.createElement('button'); editBtn.textContent='Edit'; editBtn.onclick=()=>editEntry(entry.id);
+        const delBtn = document.createElement('button'); delBtn.textContent='Delete'; delBtn.onclick=()=>deleteEntry(entry.id);
+        controlTd.appendChild(editBtn); controlTd.appendChild(delBtn);
+        tr.appendChild(dateTd); tr.appendChild(startTd); tr.appendChild(endTd); tr.appendChild(hoursTd); tr.appendChild(projectTd); tr.appendChild(notesTd); tr.appendChild(controlTd);
+        entriesTbody.appendChild(tr);
+      });
+      renderSummary(filter);
+    }
+
+    function renderSummary(filter){
+      summaryArea.innerHTML='';
+      const list = (state.entries || []).slice();
+      // compute totals for this week/biweekly/month
+      const now = new Date();
+      const weekStart = new Date(now); weekStart.setHours(0,0,0,0); weekStart.setDate(now.getDate() - (now.getDay()+6)%7); // monday start
+      const twoWeeksAgo = new Date(weekStart); twoWeeksAgo.setDate(weekStart.getDate()-7);
+      const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
+
+      const buckets = [
+        {id:'weekly',label:'This week',start:weekStart,end:now},
+        {id:'biweekly',label:'This biweekly',start:twoWeeksAgo,end:now},
+        {id:'monthly',label:'This month',start:monthStart,end:now}
+      ];
+
+      buckets.forEach(b=>{
+        let total=0; let byProject = {};
+        list.forEach(entry=>{
+          const s=new Date(entry.startISO);
+          if(s >= b.start && s <= b.end){
+            const hours = entry.endISO ? diffHours(entry.startISO, entry.endISO) : (Date.now() - new Date(entry.startISO))/36e5;
+            total += Math.max(0,hours);
+            if(entry.project){ byProject[entry.project] = (byProject[entry.project]||0) + Math.max(0,hours); }
+          }
+        });
+        const card = document.createElement('div'); card.className = 'card stat accentBox';
+        card.innerHTML = `<div style="font-weight:700">${b.label}</div><div class="tiny muted">Hours: ${total.toFixed(2)}</div><div class="tiny muted">Projects: ${Object.keys(byProject).length}</div>`;
+        card.onclick = ()=>{ // apply preview
+          const wage = Number(wageInput.value) || 0; const period = b.id; const pay = computePay(total,wage,period); payPreview.textContent = formatMoney(pay);
+        };
+        summaryArea.appendChild(card);
+      });
+
+      // overall totals and project breakdown
+      let overall=0; const projects={};
+      list.forEach(entry=>{ const hours = entry.endISO ? diffHours(entry.startISO, entry.endISO) : (Date.now() - new Date(entry.startISO))/36e5; overall+=Math.max(0,hours); if(entry.project) projects[entry.project]=(projects[entry.project]||0)+Math.max(0,hours); });
+      const overallCard = document.createElement('div'); overallCard.className='card stat green'; overallCard.innerHTML = `<div style="font-weight:700">All time</div><div class="tiny muted">Hours: ${overall.toFixed(2)}</div><div class="tiny muted">Unique projects: ${Object.keys(projects).length}</div>`;
+      summaryArea.appendChild(overallCard);
+
+      // project cards
+      Object.entries(projects).slice(0,6).forEach(([k,v])=>{
+        const card = document.createElement('div'); card.className='card stat'; card.innerHTML = `<div style="font-weight:700">${k}</div><div class="tiny muted">Hours: ${v.toFixed(2)}</div>`; summaryArea.appendChild(card);
+      });
+    }
+
+    function formatMoney(n){ return '$'+Number(n||0).toFixed(2); }
+
+    function computePay(hours,wage,period){ // wage is hourly
+      // period argument is only for labeling here; actual pay = hours * wage
+      return (hours||0) * (wage||0);
+    }
+
+    /* -------------------- Actions -------------------- */
+    function addEntry(obj){ obj.id = obj.id || uid(); state.entries = state.entries || []; state.entries.push(obj); saveState(); renderEntries(currentFilter); }
+    function editEntry(id){ const e = state.entries.find(x=>x.id===id); if(!e) return; const newStart = prompt('Edit start (ISO or local):', e.startISO); const newEnd = prompt('Edit end (ISO or local, leave blank for live):', e.endISO || ''); if(newStart) e.startISO = parseToISO(newStart); if(newEnd) e.endISO = parseToISO(newEnd); const newProj = prompt('Project/tag:', e.project||''); const newNotes = prompt('Notes:', e.notes||''); e.project = newProj; e.notes = newNotes; saveState(); renderEntries(currentFilter); }
+    function deleteEntry(id){ const idx = state.entries.findIndex(x=>x.id===id); if(idx>-1){ state.lastDeleted = state.entries[idx]; state.entries.splice(idx,1); saveState(); renderEntries(currentFilter); } }
+    function undoDelete(){ if(state.lastDeleted){ state.entries.push(state.lastDeleted); state.lastDeleted=null; saveState(); renderEntries(currentFilter); } }
+
+    function parseToISO(str){ // try to be flexible with input
+      // if a datetime-local from input, browsers give YYYY-MM-DDTHH:MM
+      if(!str) return null;
+      // if already ISO
+      const d = new Date(str); if(!isNaN(d)) return d.toISOString();
+      return new Date().toISOString();
+    }
+
+    /* -------------------- Live timer logic -------------------- */
+    let liveTicker = null;
+    function startLive(project, startISO){ if(state.live) return; const obj = {id: uid(), startISO: startISO || new Date().toISOString(), endISO: null, project: project||'', notes: ''}; state.live = {id: obj.id, startISO: obj.startISO, project: obj.project}; addEntry(obj); saveState(); updateLiveUI(); liveTicker = setInterval(updateLiveUI,500); }
+    function stopLive(){ if(!state.live) return; const liveId = state.live.id; const entry = state.entries.find(e=>e.id===liveId); if(entry){ entry.endISO = new Date().toISOString(); }
+      state.live = null; saveState(); if(liveTicker) clearInterval(liveTicker); liveTicker = null; updateLiveUI(); renderEntries(currentFilter);
+    }
+
+    function updateLiveUI(){ if(state.live){ liveDisplay.textContent = 'Live: ' + isoToLocalStr(state.live.startISO) + (state.live.project?(' • '+state.live.project):''); liveStartBtn.disabled=true; liveStopBtn.disabled=false; } else { liveDisplay.textContent = 'Not running'; liveStartBtn.disabled=false; liveStopBtn.disabled=true; }
+      // update running hours in entries table too
+      renderEntries(currentFilter);
+    }
+
+    /* -------------------- Wiring up UI -------------------- */
+    loadState(); document.getElementById('roundingSelect').value = state.settings.rounding || 'none'; document.getElementById('overtimeThreshold').value = state.settings.overtimeThreshold || 40; document.getElementById('autoBreakOn').checked = state.settings.autoBreakOn !== false;
+
+    document.getElementById('addManual').addEventListener('click', ()=>{
+      const s = document.getElementById('manualStart').value; const e = document.getElementById('manualEnd').value; const proj = document.getElementById('manualProject').value;
+      if(!s || !e){ alert('Please provide both start and end (or use decimal hours in end like "+1.5hrs" — but that is advanced).'); return; }
+      const startISO = parseToISO(s); const endISO = parseToISO(e);
+      addEntry({startISO,endISO,project:proj,notes:''});
+    });
+
+    document.getElementById('startLateBtn').addEventListener('click', ()=>{
+      const t = document.getElementById('startLateTime').value; const p = document.getElementById('startLateProject').value;
+      if(!t){ alert('Pick a start time to backdate to.'); return; }
+      const iso = parseToISO(t);
+      startLive(p, iso);
+    });
+
+    liveStartBtn.addEventListener('click', ()=>{ const p = prompt('Project/Tag (optional):',''); startLive(p); });
+    liveStopBtn.addEventListener('click', ()=>{ stopLive(); });
+
+    document.getElementById('exportCSV').addEventListener('click', ()=>{
+      const rows = [['id','startISO','endISO','project','notes']]; state.entries.forEach(e=>rows.push([e.id,e.startISO||'',e.endISO||'',e.project||'',e.notes||'']));
+      const csv = rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='work-hours.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),5000);
+    });
+
+    document.getElementById('importFile').addEventListener('change', (ev)=>{
+      const f = ev.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = (e)=>{
+        const txt = e.target.result; const lines = txt.split(/\r?\n/).filter(Boolean); const rows = lines.map(l=>l.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/)); // naive CSV
+        const header = rows.shift().map(h=>h.replace(/\"/g,'').replace(/"/g,'')); rows.forEach(r=>{
+          const obj = {};
+          header.forEach((k,i)=> obj[k]= (r[i]||'').replace(/^"|"$/g,''));
+          if(obj.id && obj.startISO) state.entries.push({id:obj.id,startISO:obj.startISO,endISO:obj.endISO,project:obj.project,notes:obj.notes});
+        }); saveState(); renderEntries(currentFilter);
+      }; reader.readAsText(f);
+    });
+
+    document.getElementById('undoDelete').addEventListener('click', ()=>undoDelete());
+    document.getElementById('applyFilter').addEventListener('click', ()=>{ const ftag=document.getElementById('filterTag').value; const from=document.getElementById('filterFrom').value; const to=document.getElementById('filterTo').value; currentFilter = {tag:ftag, from: from||null, to: to||null}; renderEntries(currentFilter); });
+    document.getElementById('clearFilter').addEventListener('click', ()=>{ document.getElementById('filterFrom').value=''; document.getElementById('filterTo').value=''; document.getElementById('filterTag').value=''; currentFilter=null; renderEntries(currentFilter); });
+
+    document.getElementById('wageInput').addEventListener('input', ()=>{ const wage = Number(wageInput.value)||0; const period = periodSelect.value; // preview using weekly bucket
+      // compute currently visible period's hours (use weekly by default)
+      const weeklyCard = summaryArea.querySelector('.stat'); // not perfect; compute fresh
+      // We'll compute hours for chosen period by iterating entries
+      const hours = computePeriodHours(period);
+      payPreview.textContent = formatMoney(computePay(hours,wage,period));
+    });
+
+    document.getElementById('roundingSelect').addEventListener('change',(e)=>{ state.settings.rounding = e.target.value; saveState(); renderEntries(currentFilter); });
+    document.getElementById('overtimeThreshold').addEventListener('change',(e)=>{ state.settings.overtimeThreshold = Number(e.target.value||40); saveState(); });
+    document.getElementById('autoBreakOn').addEventListener('change',(e)=>{ state.settings.autoBreakOn = e.target.checked; saveState(); });
+
+    function computePeriodHours(period){ const now=new Date(); let start;
+      if(period==='weekly'){ start = new Date(now); start.setHours(0,0,0,0); start.setDate(now.getDate() - (now.getDay()+6)%7); }
+      else if(period==='biweekly'){ start = new Date(now); start.setHours(0,0,0,0); start.setDate(now.getDate() - (now.getDay()+6)%7 -7); }
+      else if(period==='monthly'){ start = new Date(now.getFullYear(),now.getMonth(),1); }
+      else { start = new Date(0); }
+      let total=0; state.entries.forEach(e=>{ const s = new Date(e.startISO); if(s>=start && s<=now){ const hours = e.endISO ? diffHours(e.startISO,e.endISO) : (Date.now() - new Date(e.startISO))/36e5; total += Math.max(0,hours); } }); return total; }
+
+    /* -------------------- Init -------------------- */
+    let currentFilter = null;
+    renderEntries(null);
+
+    // if previous live session exists in data (live entry with no end), resume live
+    (function resumeIfNeeded(){
+      loadState(); const liveEntry = (state.entries||[]).find(e=>!e.endISO);
+      if(liveEntry){ state.live = {id: liveEntry.id, startISO: liveEntry.startISO, project: liveEntry.project}; liveTicker = setInterval(updateLiveUI,500); updateLiveUI(); }
+    })();
+
+    // helper: autosave periodically
+    setInterval(()=>saveState(),10000);
+  </script>
+</body>
+</html>
